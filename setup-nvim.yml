@@ -12,17 +12,24 @@
         name: [software-properties-common, curl, git, xclip, build-essential, gnupg]
         update_cache: yes
 
-    - name: Fix GPG key for Neovim PPA
-      shell: |
-        gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys 9DBB0BE9366964F134855E2255F96FCF8231B6DD
-        gpg --export 9DBB0BE9366964F134855E2255F96FCF8231B6DD | gpg --dearmor -o /etc/apt/trusted.gpg.d/neovim-ppa.gpg
+    - name: Manually receive GPG key for Neovim PPA
+      command: gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys 9DBB0BE9366964F134855E2255F96FCF8231B6DD
+      changed_when: false
+
+    - name: Manually export key to trusted.gpg.d
+      shell: gpg --export 9DBB0BE9366964F134855E2255F96FCF8231B6DD | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/neovim-ppa.gpg
       args:
         creates: /etc/apt/trusted.gpg.d/neovim-ppa.gpg
 
-    - name: Add Neovim stable PPA
+  - name: Add Neovim stable PPA (Fixed GPG)
       apt_repository:
         repo: 'ppa:neovim-ppa/stable'
         state: present
+        update_cache: yes
+      register: ppa_added
+      retries: 3
+      delay: 5
+      until: ppa_added is success
 
     - name: Install Neovim
       apt:
