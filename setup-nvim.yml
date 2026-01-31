@@ -98,9 +98,9 @@
     - name: Setup nvim-venv with pynvim
       shell: |
         {{ user_home }}/.local/bin/uv venv {{ user_home }}/.nvim-venv
-        {{ user_home }}/.local/bin/uv pip install pynvim
+        {{ user_home }}/.nvim-venv/bin/python -m pip install pynvim
       args:
-        creates: "{{ user_home }}/.nvim-venv"
+        creates: "{{ user_home }}/.nvim-venv/bin/python"
       become: no
 
     - name: Headless install of Plugins and LSP
