@@ -12,24 +12,22 @@
         name: [software-properties-common, curl, git, xclip, build-essential, gnupg]
         update_cache: yes
 
-    - name: Manually receive GPG key for Neovim PPA
-      command: gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys 9DBB0BE9366964F134855E2255F96FCF8231B6DD
-      changed_when: false
+    - name: Download Neovim GPG key via HTTPS
+      get_url:
+        url: "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x9DBB0BE9366964F134855E2255F96FCF8231B6DD"
+        dest: /tmp/neovim.key
+      register: key_download
 
-    - name: Manually export key to trusted.gpg.d
-      shell: gpg --export 9DBB0BE9366964F134855E2255F96FCF8231B6DD | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/neovim-ppa.gpg
+    - name: De-armor and install GPG key
+      shell: cat /tmp/neovim.key | gpg --dearmor > /etc/apt/trusted.gpg.d/neovim-ppa.gpg
       args:
         creates: /etc/apt/trusted.gpg.d/neovim-ppa.gpg
 
-    - name: Add Neovim stable PPA (Fixed GPG)
+    - name: Add Neovim repository line manually
       apt_repository:
-        repo: 'ppa:neovim-ppa/stable'
+        repo: "deb http://ppa.launchpad.net/neovim-ppa/stable/ubuntu {{ ansible_distribution_release }} main"
         state: present
         update_cache: yes
-      register: ppa_added
-      retries: 3
-      delay: 5
-      until: ppa_added is success
 
     - name: Install Neovim
       apt:
@@ -53,6 +51,9 @@
       copy:
         dest: "{{ user_home }}/.config/nvim/init.lua"
         content: |
+          -- Point Neovim to the dedicated uv virtualenv
+          vim.g.python3_host_prog = vim.fn.expand("~/.nvim-venv/bin/python")
+
           local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
           if not vim.loop.fs_stat(lazypath) then
             vim.fn.system({"git", "clone", "--filter=blob:none", "https://github.com/folke/lazy.nvim.git", "--branch=stable", lazypath})
@@ -90,6 +91,14 @@
         mode: '0644'
       become: no
 
+    - name: Setup nvim-venv with pynvim
+      shell: |
+        {{ user_home }}/.local/bin/uv venv {{ user_home }}/.nvim-venv
+        {{ user_home }}/.local/bin/uv pip install pynvim
+      args:
+        creates: "{{ user_home }}/.nvim-venv"
+      become: no
+
     - name: Headless install of Plugins and LSP
       shell: |
         export PATH="{{ user_home }}/.local/bin:$PATH"
@@ -97,11 +106,3 @@
         nvim --headless "-c MasonInstall pyright ruff" +qa
       become: no
       ignore_errors: yes
-
-    - name: Setup nvim-venv
-      shell: |
-        {{ user_home }}/.local/bin/uv venv {{ user_home }}/.nvim-venv
-        {{ user_home }}/.local/bin/uv pip install pynvim
-      args:
-        creates: "{{ user_home }}/.nvim-venv"
-      become: no
