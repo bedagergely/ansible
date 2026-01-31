@@ -1,6 +1,6 @@
 ---
 - name: Full Neovim & UV Python Setup
-  hosts: all
+  hosts: localhost
   become: yes
   vars:
     user_home: "/home/{{ ansible_user_id }}"
