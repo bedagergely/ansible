@@ -11,21 +11,20 @@
       apt:
         name: [software-properties-common, curl, git, xclip, build-essential, gnupg]
         update_cache: yes
+        
+    - name: Remove any failed PPA attempts
+      file:
+        path: "/etc/apt/sources.list.d/neovim-ppa-stable-{{ ansible_distribution_release }}.list"
+        state: absent
 
-    - name: Download Neovim GPG key via HTTPS
+    - name: Download Neovim GPG key
       get_url:
         url: "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x9DBB0BE9366964F134855E2255F96FCF8231B6DD"
-        dest: /tmp/neovim.key
-      register: key_download
+        dest: /etc/apt/trusted.gpg.d/neovim-ppa.asc
 
-    - name: De-armor and install GPG key
-      shell: cat /tmp/neovim.key | gpg --dearmor > /etc/apt/trusted.gpg.d/neovim-ppa.gpg
-      args:
-        creates: /etc/apt/trusted.gpg.d/neovim-ppa.gpg
-
-    - name: Add Neovim repository line manually
+    - name: Add Neovim Noble repository (Workaround for Plucky)
       apt_repository:
-        repo: "deb http://ppa.launchpad.net/neovim-ppa/stable/ubuntu {{ ansible_distribution_release }} main"
+        repo: "deb [signed-by=/etc/apt/trusted.gpg.d/neovim-ppa.asc] http://ppa.launchpad.net/neovim-ppa/stable/ubuntu noble main"
         state: present
         update_cache: yes
 
