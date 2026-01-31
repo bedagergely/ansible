@@ -1,25 +1,72 @@
 ---
 - name: Update system
   apt: { update_cache: yes, upgrade: dist }
-
 - name: Create sudo user
   user:
     name: "{{ deploy_user }}"
     groups: sudo
     append: yes
     shell: /bin/bash
-
+- name: Allow '{{ deploy_user }}' to use sudo without a password
+  lineinfile:
+    path: /etc/sudoers.d/90-{{ deploy_user }}-init
+    line: "{{ deploy_user }} ALL=(ALL) NOPASSWD:ALL"
+    state: present
+    mode: '0440'
+    create: yes
+    validate: 'visudo -cf %s'
 - name: Add SSH key
   authorized_key:
     user: "{{ deploy_user }}"
     key: "{{ lookup('file', ssh_public_key_path) }}"
-
 - name: Secure SSH config
   lineinfile:
     path: /etc/ssh/sshd_config
     regexp: "{{ item.regexp }}"
     line: "{{ item.line }}"
   loop:
+    - { regexp: '^#?Port', line: 'Port {{ ssh_port }}' }
     - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin prohibit-password' }
     - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
   notify: Restart SSH service
+- name: Install UFW
+  apt:
+    name: ufw
+    state: present
+- name: Configure UFW - Allow SSH on the new port
+  ufw:
+    rule: allow
+    port: "{{ ssh_port }}"
+    proto: tcp
+- name: Enable UFW and set default deny policy
+  ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+- name: Update UFW to use Rate Limiting on SSH port
+  ufw:
+    rule: limit
+    port: "{{ ssh_port }}"
+    proto: tcp
+- name: Install Fail2Ban
+  apt:
+    name: fail2ban
+    state: present
+- name: Create Fail2Ban local jail configuration
+  copy:
+    dest: /etc/fail2ban/jail.local
+    content: |
+      [sshd]
+      enabled = true
+      port = {{ ssh_port }}
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 3
+      bantime = 1h
+      findtime = 10m
+  notify: Restart Fail2Ban
+- name: Ensure Fail2Ban is started and enabled
+  service:
+    name: fail2ban
+    state: started
+    enabled: yes
