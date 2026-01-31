@@ -4,7 +4,9 @@
   connection: local
   become: yes
   vars:
-    user_home: "/home/{{ ansible_user_id }}"
+    # This finds the user who started the playbook, not 'root'
+    real_user: "{{ ansible_env.SUDO_USER | default(ansible_user_id) }}"
+    user_home: "/home/{{ ansible_env.SUDO_USER | default(ansible_user_id) }}"
 
   tasks:
     - name: Install system dependencies
@@ -39,12 +41,15 @@
         creates: "{{ user_home }}/.local/bin/uv"
       become: no
 
-    - name: Create config directory
+    - name: Create Neovim config directory
       file:
         path: "{{ user_home }}/.config/nvim"
         state: directory
+        owner: "{{ real_user }}"
+        group: "{{ real_user }}"
         mode: '0755'
-      become: no
+      # We still use become: yes to ensure we have permission to create folders,
+      # but we explicitly set the owner to you.
 
     - name: Deploy init.lua
       copy:
