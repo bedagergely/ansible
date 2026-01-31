@@ -1,0 +1,87 @@
+---
+- name: Full Neovim & UV Python Setup
+  hosts: all
+  become: yes
+  vars:
+    user_home: "/home/{{ ansible_user_id }}"
+
+  tasks:
+    - name: Install system dependencies
+      apt:
+        name: [software-properties-common, curl, git, xclip, build-essential]
+        update_cache: yes
+
+    - name: Add Neovim PPA
+      apt_repository:
+        repo: ppa:neovim-ppa/stable
+
+    - name: Install Neovim
+      apt:
+        name: neovim
+        state: present
+
+    - name: Install uv toolchain
+      shell: curl -LsSf https://astral.sh/uv/install.sh | sh
+      args:
+        creates: "{{ user_home }}/.local/bin/uv"
+      become: no
+
+    - name: Create config directory
+      file:
+        path: "{{ user_home }}/.config/nvim"
+        state: directory
+        mode: '0755'
+      become: no
+
+    - name: Deploy init.lua
+      copy:
+        dest: "{{ user_home }}/.config/nvim/init.lua"
+        content: |
+          local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+          if not vim.loop.fs_stat(lazypath) then
+            vim.fn.system({"git", "clone", "--filter=blob:none", "https://github.com/folke/lazy.nvim.git", "--branch=stable", lazypath})
+          end
+          vim.opt.rtp:prepend(lazypath)
+
+          require("lazy").setup({
+            { "neovim/nvim-lspconfig" },
+            { "williamboman/mason.nvim", config = true },
+            { "williamboman/mason-lspconfig.nvim", config = true },
+            { "nvim-treesitter/nvim-treesitter", build = ":TSUpdate" },
+            { "stevearc/conform.nvim", opts = {
+                formatters_by_ft = { python = { "ruff_format" } },
+                format_on_save = { timeout_ms = 500, lsp_fallback = true }
+            }},
+          })
+
+          local lspconfig = require('lspconfig')
+          local function get_python_path(workspace)
+            local venv = os.getenv("VIRTUAL_ENV") or (workspace .. "/.venv")
+            if vim.fn.executable(venv .. "/bin/python") == 1 then return venv .. "/bin/python" end
+            return "python3"
+          end
+
+          lspconfig.pyright.setup({
+            before_init = function(_, config)
+              config.settings.python.pythonPath = get_python_path(config.root_dir)
+            end,
+          })
+          lspconfig.ruff.setup({})
+        mode: '0644'
+      become: no
+
+    - name: Headless install of Plugins and LSP servers
+      shell: |
+        nvim --headless "+Lazy! sync" +qa
+        nvim --headless "-c MasonInstall pyright ruff" +qa
+      become: no
+      register: nvim_install
+      changed_when: "'Installed' in nvim_install.stdout"
+
+    - name: Setup nvim-venv with pynvim
+      shell: |
+        {{ user_home }}/.local/bin/uv venv {{ user_home }}/.nvim-venv
+        {{ user_home }}/.local/bin/uv pip install pynvim
+      args:
+        creates: "{{ user_home }}/.nvim-venv"
+      become: no
