@@ -1,0 +1,25 @@
+---
+- name: Update system
+  apt: { update_cache: yes, upgrade: dist }
+
+- name: Create sudo user
+  user:
+    name: "{{ deploy_user }}"
+    groups: sudo
+    append: yes
+    shell: /bin/bash
+
+- name: Add SSH key
+  authorized_key:
+    user: "{{ deploy_user }}"
+    key: "{{ lookup('file', ssh_public_key_path) }}"
+
+- name: Secure SSH config
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  loop:
+    - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin prohibit-password' }
+    - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+  notify: Restart SSH service
