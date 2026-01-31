@@ -9,12 +9,20 @@
   tasks:
     - name: Install system dependencies
       apt:
-        name: [software-properties-common, curl, git, xclip, build-essential]
+        name: [software-properties-common, curl, git, xclip, build-essential, gnupg]
         update_cache: yes
 
-    - name: Add Neovim PPA
+    - name: Fix GPG key for Neovim PPA
+      shell: |
+        gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys 9DBB0BE9366964F134855E2255F96FCF8231B6DD
+        gpg --export 9DBB0BE9366964F134855E2255F96FCF8231B6DD | gpg --dearmor -o /etc/apt/trusted.gpg.d/neovim-ppa.gpg
+      args:
+        creates: /etc/apt/trusted.gpg.d/neovim-ppa.gpg
+
+    - name: Add Neovim stable PPA
       apt_repository:
-        repo: ppa:neovim-ppa/stable
+        repo: 'ppa:neovim-ppa/stable'
+        state: present
 
     - name: Install Neovim
       apt:
@@ -68,18 +76,22 @@
             end,
           })
           lspconfig.ruff.setup({})
+
+          -- UV Keybindings
+          vim.keymap.set('n', '<leader>r', ':split | term uv run %<CR>', { desc = 'Run with uv' })
+          vim.keymap.set('n', '<leader>us', ':!uv sync<CR>', { desc = 'uv sync' })
         mode: '0644'
       become: no
 
-    - name: Headless install of Plugins and LSP servers
+    - name: Headless install of Plugins and LSP
       shell: |
+        export PATH="{{ user_home }}/.local/bin:$PATH"
         nvim --headless "+Lazy! sync" +qa
         nvim --headless "-c MasonInstall pyright ruff" +qa
       become: no
-      register: nvim_install
-      changed_when: "'Installed' in nvim_install.stdout"
+      ignore_errors: yes
 
-    - name: Setup nvim-venv with pynvim
+    - name: Setup nvim-venv
       shell: |
         {{ user_home }}/.local/bin/uv venv {{ user_home }}/.nvim-venv
         {{ user_home }}/.local/bin/uv pip install pynvim
