@@ -21,7 +21,7 @@
       args:
         creates: /etc/apt/trusted.gpg.d/neovim-ppa.gpg
 
-  - name: Add Neovim stable PPA (Fixed GPG)
+    - name: Add Neovim stable PPA (Fixed GPG)
       apt_repository:
         repo: 'ppa:neovim-ppa/stable'
         state: present
