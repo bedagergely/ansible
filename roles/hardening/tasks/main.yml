@@ -1,12 +1,14 @@
 ---
 - name: Update system
   apt: { update_cache: yes, upgrade: dist }
+  
 - name: Create sudo user
   user:
     name: "{{ deploy_user }}"
     groups: sudo
     append: yes
     shell: /bin/bash
+    
 - name: Allow '{{ deploy_user }}' to use sudo without a password
   lineinfile:
     path: /etc/sudoers.d/90-{{ deploy_user }}-init
@@ -15,11 +17,13 @@
     mode: '0440'
     create: yes
     validate: 'visudo -cf %s'
+    
 - name: Add SSH key to sysadmin user
   authorized_key:
     user: "{{ deploy_user }}"
     state: present
     key: "{{ ssh_public_key }}"
+    
 - name: Secure SSH config
   lineinfile:
     path: /etc/ssh/sshd_config
@@ -29,30 +33,44 @@
     - { regexp: '^#?Port', line: 'Port {{ ssh_port }}' }
     - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin prohibit-password' }
     - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+    - { regexp: '^#?MaxAuthTries', line: 'MaxAuthTries 3' }
+    - { regexp: '^#?AllowAgentForwarding', line: 'AllowAgentForwarding no' }
   notify: Restart SSH service
+  
 - name: Install UFW
   apt:
     name: ufw
     state: present
+    
 - name: Configure UFW - Allow SSH on the new port
   ufw:
     rule: allow
     port: "{{ ssh_port }}"
     proto: tcp
+
+- name: Explicitly deny default SSH port 22 in UFW
+  community.general.ufw:
+    rule: deny
+    port: '22'
+    proto: tcp
+    
 - name: Enable UFW and set default deny policy
   ufw:
     state: enabled
     policy: deny
     direction: incoming
+    
 - name: Update UFW to use Rate Limiting on SSH port
   ufw:
     rule: limit
     port: "{{ ssh_port }}"
     proto: tcp
+    
 - name: Install Fail2Ban
   apt:
     name: fail2ban
     state: present
+    
 - name: Create Fail2Ban local jail configuration
   copy:
     dest: /etc/fail2ban/jail.local
@@ -66,8 +84,35 @@
       bantime = 1h
       findtime = 10m
   notify: Restart Fail2Ban
+  
 - name: Ensure Fail2Ban is started and enabled
   service:
     name: fail2ban
     state: started
     enabled: yes
+
+- name: Apply Kernel Hardening via sysctl
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    - { name: 'net.ipv4.conf.all.rp_filter', value: '1' }         # IP Spoofing protection
+    - { name: 'net.ipv4.conf.all.accept_redirects', value: '0' }  # Prevent MitM
+    - { name: 'net.ipv4.conf.all.send_redirects', value: '0' }
+    - { name: 'net.ipv4.icmp_echo_ignore_broadcasts', value: '1' } # Prevent Smurf attacks
+    - { name: 'net.ipv6.conf.all.disable_ipv6', value: '1' }      # Disable IPv6 if not used
+    - { name: 'fs.protected_hardlinks', value: '1' }             # Prevent symlink attacks
+    - { name: 'fs.protected_symlinks', value: '1' }
+
+- name: Secure shared memory (/dev/shm)
+  mount:
+    name: /dev/shm
+    fstype: tmpfs
+    opts: "defaults,noexec,nosuid,nodev"
+    state: mounted
+
+## 6. Audit & Intrusion Detection
+- name: Start and enable Auditd
+  service: { name: auditd, state: started, enabled: yes }
