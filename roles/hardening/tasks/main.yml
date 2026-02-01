@@ -35,10 +35,13 @@
     - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
     - { regexp: '^#?MaxAuthTries', line: 'MaxAuthTries 3' }
     - { regexp: '^#?AllowAgentForwarding', line: 'AllowAgentForwarding no' }
-  notify: Restart SSH service
+  register: ssh_config_changed
   
-- name: Flush handlers
-  meta: flush_handlers
+- name: Restart SSH immediately if config changed
+  service:
+    name: ssh
+    state: restarted
+  when: ssh_config_changed.changed
   
 - name: Install UFW
   apt:
@@ -49,12 +52,6 @@
   ufw:
     rule: allow
     port: "{{ ssh_port }}"
-    proto: tcp
-
-- name: Explicitly deny default SSH port 22 in UFW
-  ufw:
-    rule: deny
-    port: '22'
     proto: tcp
     
 - name: Enable UFW and set default deny policy
