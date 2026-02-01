@@ -37,6 +37,9 @@
     - { regexp: '^#?AllowAgentForwarding', line: 'AllowAgentForwarding no' }
   notify: Restart SSH service
   
+- name: Flush handlers
+  meta: flush_handlers
+  
 - name: Install UFW
   apt:
     name: ufw
