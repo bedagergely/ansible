@@ -106,6 +106,3 @@
     - { name: 'fs.protected_hardlinks', value: '1' }             # Prevent symlink attacks
     - { name: 'fs.protected_symlinks', value: '1' }
     
-## 6. Audit & Intrusion Detection
-- name: Start and enable Auditd
-  service: { name: auditd, state: started, enabled: yes }
