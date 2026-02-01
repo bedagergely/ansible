@@ -105,14 +105,7 @@
     - { name: 'net.ipv6.conf.all.disable_ipv6', value: '1' }      # Disable IPv6 if not used
     - { name: 'fs.protected_hardlinks', value: '1' }             # Prevent symlink attacks
     - { name: 'fs.protected_symlinks', value: '1' }
-
-- name: Secure shared memory (/dev/shm)
-  mount:
-    name: /dev/shm
-    fstype: tmpfs
-    opts: "defaults,noexec,nosuid,nodev"
-    state: mounted
-
+    
 ## 6. Audit & Intrusion Detection
 - name: Start and enable Auditd
   service: { name: auditd, state: started, enabled: yes }
