@@ -1,4 +1,4 @@
-### Install Ansible un ubuntu
+### Install Ansible on ubuntu
 
 ```
 $ sudo apt update
