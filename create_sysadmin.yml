@@ -1,0 +1,23 @@
+---
+- hosts: localhost
+  connection: local
+  vars:
+    deploy_user: "sysadmin"
+    ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGLe/BYbkxGGD9WKFAzvE0IOKFSy84fdJ8fys2RFFygN bedagergely"
+    ssh_port: "2222"
+  tasks:
+    - name: Update system
+      apt: { update_cache: yes, upgrade: dist }
+
+    - name: Create sudo user
+      user:
+        name: "{{ deploy_user }}"
+        group: sudo
+        append: yes
+        shell: /bin/bash
+
+    - name: Set authorized keys taken from url
+      ansible.posix.authorized_key:
+        user: "{{ deploy_user }}"
+        state: present
+        key: "{{ ssh_public_key }}"
