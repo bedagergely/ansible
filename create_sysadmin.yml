@@ -4,7 +4,6 @@
   vars:
     deploy_user: "sysadmin"
     ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGLe/BYbkxGGD9WKFAzvE0IOKFSy84fdJ8fys2RFFygN bedagergely"
-    ssh_port: "2222"
   tasks:
     - name: Update system
       apt: { update_cache: yes, upgrade: dist }

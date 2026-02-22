@@ -1,0 +1,39 @@
+---
+- name: Configure UFW for SSH and Custom Port
+  hosts: localhost
+  connection: local
+  become: yes
+  vars:
+    custom_ssh_port: "2222"
+
+  tasks:
+    - name: Ensure UFW is installed
+      apt:
+        name: ufw
+        state: present
+
+    - name: Set default incoming policy to DENY
+      community.general.ufw:
+        direction: incoming
+        policy: deny
+
+    - name: Set default outgoing policy to ALLOW
+      community.general.ufw:
+        direction: outgoing
+        policy: allow
+
+    - name: Allow standard SSH (Port 22)
+      community.general.ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+
+    - name: Allow custom port
+      community.general.ufw:
+        rule: allow
+        port: "{{ custom_ssh_port }}"
+        proto: tcp
+
+    - name: Enable UFW
+      community.general.ufw:
+        state: enabled
