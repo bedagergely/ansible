@@ -1,0 +1,29 @@
+---
+- name: Set System Language to en_US.UTF-8
+  hosts: localhost
+  connection: local
+  become: yes
+  tasks:
+    - name: Ensure en_US.UTF-8 locale is generated
+      ansible.builtin.locale_gen:
+        name: en_US.UTF-8
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Set system locale using localectl
+      ansible.builtin.command:
+        cmd: localectl set-locale LANG=en_US.UTF-8
+      register: locale_result
+      changed_when: locale_result.rc == 0
+
+    - name: Ensure /etc/default/locale is explicitly set (Debian/Ubuntu)
+      ansible.builtin.copy:
+        content: |
+          LANG=en_US.UTF-8
+          LC_ALL=en_US.UTF-8
+        dest: /etc/default/locale
+        mode: '0644'
+      when: ansible_os_family == "Debian"
+
+    - name: Update environment variables immediately
+      ansible.builtin.shell: export LANG=en_US.UTF-8
